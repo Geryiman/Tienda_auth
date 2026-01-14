@@ -1,0 +1,24 @@
+npm install -D typescript ts-node @types/node @types/express @types/cors @types/pg nodemon
+# Express (servidor), Dotenv (variables entorno), Cors (seguridad básica)
+npm install express dotenv cors pg reflect-metadata# helmet: Configura cabeceras HTTP seguras (oculta info del servidor, previene XSS básicos).
+# express-rate-limit: Evita ataques de fuerza bruta limitando intentos de conexión.
+# cors: Controla quién puede hablar con la API.
+npm install helmet express-rate-limit cors
+npm install -D @types/cors
+
+# Instala el CLI de Prisma (solo para desarrollo)
+npm install prisma --save-dev
+
+# Instala el Cliente de Prisma (lo que usará tu código)
+npm install @prisma/client
+
+# Inicializa Prisma
+npx prisma init
+
+para la base de datos actualiza en docker 
+npx prisma migrate dev --name init_security_schema
+
+
+para hashear las cosas 
+npm install bcrypt
+npm install -D @types/bcrypt

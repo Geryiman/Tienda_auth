@@ -1,0 +1,149 @@
+SET timezone = 'UTC';
+-- ============================================
+-- 1. TABLA DE ROLES
+-- ============================================
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL,   -- Ej: admin, vendedor, cliente
+    description TEXT
+);
+
+-- ============================================
+-- 2. TABLA DE PERMISOS
+-- ============================================
+CREATE TABLE permissions (
+    id SERIAL PRIMARY KEY,
+    slug VARCHAR(100) UNIQUE NOT NULL,   -- Ej: products.create
+    description TEXT
+);
+
+-- ============================================
+-- 3. ROLES ↔ PERMISOS (RBAC)
+-- ============================================
+CREATE TABLE role_permissions (
+    role_id INT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    permission_id INT NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+    PRIMARY KEY (role_id, permission_id)
+);
+
+-- ============================================
+-- 4. TABLA DE USUARIOS (SEGURIDAD COMPLETA)
+-- ============================================
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(100) UNIQUE NOT NULL,
+
+    -- CONTRASEÑA CIFRADA (bcrypt / argon2)
+    password_hash VARCHAR(255) NOT NULL,
+
+    -- ESTADO DEL USUARIO
+    is_active BOOLEAN DEFAULT TRUE,
+    is_verified BOOLEAN DEFAULT FALSE,
+
+    -- PROTECCIÓN FUERZA BRUTA
+    failed_login_attempts INT DEFAULT 0,
+    locked_until TIMESTAMP,
+
+    -- MFA / 2FA (SECRETO CIFRADO)
+    is_mfa_enabled BOOLEAN DEFAULT FALSE,
+    mfa_secret_encrypted TEXT,
+
+    -- AUDITORÍA
+    last_login TIMESTAMP,
+    last_ip VARCHAR(45),
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 5. USUARIOS ↔ ROLES (MULTI-ROL)
+-- ============================================
+CREATE TABLE user_roles (
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id INT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, role_id)
+);
+
+-- ============================================
+-- 6. CONFIRMACIÓN DE EMAIL
+-- ============================================
+CREATE TABLE email_verifications (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    verified BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 7. RESET DE CONTRASEÑA
+-- ============================================
+CREATE TABLE password_resets (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 8. LOGS DE SEGURIDAD (AUDITORÍA)
+-- ============================================
+CREATE TABLE security_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) ON DELETE SET NULL,
+    action VARCHAR(100) NOT NULL,       -- LOGIN_SUCCESS, LOGIN_FAILED, etc
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- ÍNDICES PARA SEGURIDAD Y RENDIMIENTO
+-- ============================================
+
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_locked_until ON users(locked_until);
+CREATE INDEX idx_security_logs_user ON security_logs(user_id);
+CREATE INDEX idx_password_resets_token ON password_resets(token_hash);
+CREATE INDEX idx_email_verifications_token ON email_verifications(token_hash)
+
+// ============================================
+// 9. REFRESH TOKENS (Gestión de Sesiones)
+// ============================================
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  
+  // Guardamos el hash del token, NO el token real.
+  // Si roban la base de datos, no pueden usar estos tokens para suplantar sesiones.
+  tokenHash String   @unique @map("token_hash") @db.VarChar(255)
+  
+  // usuario dónde está logueado.
+  userAgent String?  @map("user_agent")
+  ipAddress String?  @map("ip_address")
+  
+  isRevoked Boolean  @default(false) @map("is_revoked") // Para "Cerrar sesión" forzoso
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ============================================
+// 10. HISTORIAL DE CONTRASEÑAS
+// ============================================
+model PasswordHistory {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_history")
+}

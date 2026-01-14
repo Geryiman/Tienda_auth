@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # Base de Datos EXCLUSIVA para Auth
+  auth-db:
+    image: postgres:15-alpine
+    container_name: auth_postgres_container
+    ports:
+      - "5001:5432"
+    environment:
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: secure_auth_password
+      POSTGRES_DB: auth_database
+    volumes:
+      - auth_pg_data:/var/lib/postgresql/data
+    networks:
+      - auth-net
+
+networks:
+  auth-net:
+    driver: bridge
+
+volumes:
+  auth_pg_data:
