@@ -22,3 +22,6 @@ npx prisma migrate dev --name init_security_schema
 para hashear las cosas 
 npm install bcrypt
 npm install -D @types/bcrypt
+
+npm install jsonwebtoken
+npm install -D @types/jsonwebtoken

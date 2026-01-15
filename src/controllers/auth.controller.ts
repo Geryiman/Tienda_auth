@@ -35,4 +35,32 @@ export class AuthController {
             }
         }
     }
+
+
+static async login(req: Request, res: Response): Promise<void> {
+        try {
+            const { email, password } = req.body;
+
+            if (!email || !password) {
+                res.status(400).json({ error: 'Email and password are required' });
+                return;
+            }
+
+            const result = await AuthService.login(email, password);
+
+            res.status(200).json({
+                message: 'Login successful',
+                data: result
+            });
+
+        } catch (error: any) {
+            if (error.message === 'Invalid credentials') {
+                res.status(401).json({ error: 'Invalid email or password' });
+            } else {
+                console.error('Login error:', error);
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
+        }
+    }
+
 }

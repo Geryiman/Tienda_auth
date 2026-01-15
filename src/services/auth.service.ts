@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
-import prisma from '../config/prisma'; // Asegúrate de que esta ruta apunte a tu instancia de Prisma
+import prisma from '../config/prisma';
 import { User } from '@prisma/client';
+import jwt, {SignOptions} from 'jsonwebtoken';
+
+const secret: jwt.Secret = process.env.JWT_SECRET!;
 
 export class AuthService {
     
@@ -33,7 +36,6 @@ export class AuthService {
             data: {
                 email,
                 passwordHash,
-                // name: name || null, // Descomentar si agregaste el campo name al modelo
                 userRoles: {
                     create: {
                         role: {
@@ -52,5 +54,61 @@ export class AuthService {
         });
 
         return newUser;
+    }
+
+ /**
+     * Autentica un usuario y genera un token JWT.
+     * @param email Correo del usuario
+     * @param password Contraseña plana
+     * @returns Objeto con token y datos del usuario
+     */
+    static async login(email: string, password: string) {
+        // 1. Buscar usuario
+        const user = await prisma.user.findUnique({
+            where: { email },
+            include: {
+                userRoles: {
+                    include: { role: true } // Traemos los roles para meterlos al token
+                }
+            }
+        });
+
+        if (!user || !user.isActive) {
+            // Por seguridad, no decimos si el email existe o no, mensaje genérico.
+            throw new Error('Invalid credentials');
+        }
+
+        // 2. Verificar contraseña
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!isMatch) {
+            throw new Error('Invalid credentials');
+        }
+
+        // 3. Generar JWT (Payload)
+        // Guardamos ID y Roles en el token para usarlos en el frontend/middleware
+     const tokenPayload = {
+            userId: user.id,
+            email: user.email,
+            roles: user.userRoles.map(ur => ur.role.name)
+        };
+
+        const secret = process.env.JWT_SECRET || 'secret_default';
+const signOptions: SignOptions = {
+            expiresIn: (process.env.JWT_EXPIRES_IN ? parseInt(process.env.JWT_EXPIRES_IN) : 3600) as number | undefined
+        };
+
+const token = jwt.sign(tokenPayload, secret, signOptions);
+        // 4. (Opcional pero recomendado para seguridad Nivel 10)
+        // Aquí deberíamos guardar el hash del token en la tabla RefreshToken
+        // Lo omitiremos por un momento para probar lo básico primero.
+
+        return {
+            user: {
+                id: user.id,
+                email: user.email,
+                roles: tokenPayload.roles
+            },
+            token
+        };
     }
 }

@@ -5,6 +5,8 @@ const router = Router();
 
 // Definición de rutas del módulo Auth
 router.post('/register', AuthController.register);
+router.post('/login', AuthController.login);
+
 
 // Futuro: router.post('/login', AuthController.login);
 
