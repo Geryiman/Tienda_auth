@@ -36,6 +36,10 @@ export class AuthController {
         }
     }
 
+//     /**
+//      * Maneja la solicitud de login de usuarios.
+//      * Endpoint: POST /auth/login
+//      */
 
 static async login(req: Request, res: Response): Promise<void> {
         try {
@@ -61,6 +65,16 @@ static async login(req: Request, res: Response): Promise<void> {
                 res.status(500).json({ error: 'Internal Server Error' });
             }
         }
+        
+    }
+
+// Este método solo se ejecutará si el middleware lo permite
+    static async profile(req: any, res: Response) {
+        // req.user contiene los datos que el middleware descifró del token
+        res.json({
+            message: 'You made it! This is a protected route.',
+            user: req.user
+        });
     }
 
 }
