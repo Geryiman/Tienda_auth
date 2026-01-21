@@ -77,4 +77,11 @@ static async login(req: Request, res: Response): Promise<void> {
         });
     }
 
+    static async adminOnly(req: any, res: Response) {
+        res.json({
+            message: 'Welcome Boss! You are seeing admin-only data.',
+            secretData: 'Ganancias del día: $1,000,000 USD 💰'
+        });
+    }
+
 }
