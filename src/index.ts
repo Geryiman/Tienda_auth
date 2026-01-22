@@ -8,7 +8,9 @@ import { allowedNodeEnvironmentFlags } from "node:process";
 import { time, timeStamp } from "node:console";
 
 
+
 import authRoutes from './routes/auth.routes';
+import productRoutes from "./routes/product.routes";
 
 dortenv.config();
 
@@ -40,6 +42,8 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/products", productRoutes);
+
 
 
 app.listen(PORT, () => {

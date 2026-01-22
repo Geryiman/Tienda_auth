@@ -52,6 +52,8 @@ CREATE TABLE users (
     last_login TIMESTAMP,
     last_ip VARCHAR(45),
 
+    products Product[]
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -146,4 +148,23 @@ model PasswordHistory {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_history")
+}
+
+// ============================================
+// 11. PRODUCTOS DE LA TIENDA
+// ============================================
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  price       Float    // Usamos Float por simplicidad (en apps bancarias se usa Decimal)
+  stock       Int      @default(0)
+  imageUrl    String?  // URL de la imagen (más adelante veremos subida de archivos)
+  isActive    Boolean  @default(true) // Para "borrado suave"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relación: Un producto es creado por un Usuario (Vendedor/Admin)
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
 }

@@ -1,22 +1,12 @@
 import bcrypt from 'bcrypt';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import prisma from '../config/prisma';
-import { User } from '@prisma/client';
-import jwt, {SignOptions} from 'jsonwebtoken';
-
-const secret: jwt.Secret = process.env.JWT_SECRET!;
 
 export class AuthService {
     
-    /**
-     * Registra un nuevo usuario en la base de datos.
-     * Realiza validación de existencia previa y hasheo de contraseña.
-     * @param email Email del usuario
-     * @param password Contraseña en texto plano
-     * @param name Nombre opcional
-     * @returns Objeto de usuario creado (sin contraseña)
-     */
+    // REGISTRO
     static async registerUser(email: string, password: string, name?: string) {
-        // Verificar si el usuario ya existe
+        // 1. Validar si existe (IGUAL QUE ANTES)
         const existingUser = await prisma.user.findUnique({
             where: { email },
         });
@@ -25,88 +15,98 @@ export class AuthService {
             throw new Error('User already exists');
         }
 
-        // Generar hash de contraseña
-        // Cost factor: 10 (Estándar de industria balanceado entre seguridad/rendimiento)
+        // 2. Hashear password (IGUAL QUE ANTES)
         const saltRounds = 10;
         const passwordHash = await bcrypt.hash(password, saltRounds);
 
-        // Crear usuario con rol por defecto (CLIENT)
-        // Se asume que la base de datos tiene configurado el default para role
-        const newUser = await prisma.user.create({
-            data: {
-                email,
-                passwordHash,
-                userRoles: {
-                    create: {
-                        role: {
-                            connect: { name: 'client' }
-                        }
-                    }
-                }
-            },
-            // Seleccionamos campos específicos para no retornar el hash de la contraseña
-            select: {
-                id: true,
-                email: true,
-                isActive: true,
-                createdAt: true
+        // 3. Crear Usuario (CAMBIO OBLIGATORIO POR NUEVA BD)
+        // Antes: Guardábamos "role: 'client'" directo en el usuario.
+        // Ahora: Usamos una transacción para crear el usuario Y conectarlo con el Rol en la tabla intermedia.
+        
+        const newUser = await prisma.$transaction(async (tx) => {
+            // A. Buscamos el ID del rol 'client' en la tabla de Roles
+            const clientRole = await tx.role.findUnique({ where: { name: 'client' } });
+            
+            if (!clientRole) {
+                // Si esto pasa es porque no corriste el SEED
+                throw new Error('Internal Error: Role "client" not found. Run seed.');
             }
+
+            // B. Creamos el usuario (Sin el campo 'role', porque ya no existe)
+            const user = await tx.user.create({
+                data: {
+                    email,
+                    passwordHash, // Usamos tu nuevo nombre de campo en BD
+                    isActive: true,
+                    isVerified: false
+                }
+            });
+
+            // C. Creamos la conexión en la tabla intermedia UserRole
+            await tx.userRole.create({
+                data: {
+                    userId: user.id,
+                    roleId: clientRole.id
+                }
+            });
+
+            return user;
         });
 
-        return newUser;
+        return {
+            id: newUser.id,
+            email: newUser.email,
+            createdAt: newUser.createdAt
+        };
     }
 
- /**
-     * Autentica un usuario y genera un token JWT.
-     * @param email Correo del usuario
-     * @param password Contraseña plana
-     * @returns Objeto con token y datos del usuario
-     */
+    // LOGIN
     static async login(email: string, password: string) {
-        // 1. Buscar usuario
+        // 1. Buscar usuario (CAMBIO: Ahora debemos pedir que incluya la relación de roles)
         const user = await prisma.user.findUnique({
             where: { email },
             include: {
                 userRoles: {
-                    include: { role: true } // Traemos los roles para meterlos al token
+                    include: { role: true } // Traemos el nombre del rol (ej: 'admin', 'seller')
                 }
             }
         });
 
+        // 2. Validación Anti-Hackers (IGUAL QUE ANTES - Lógica segura)
         if (!user || !user.isActive) {
-            // Por seguridad, no decimos si el email existe o no, mensaje genérico.
             throw new Error('Invalid credentials');
         }
 
-        // 2. Verificar contraseña
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
             throw new Error('Invalid credentials');
         }
 
-        // 3. Generar JWT (Payload)
-        // Guardamos ID y Roles en el token para usarlos en el frontend/middleware
-     const tokenPayload = {
+        // 3. Preparar los roles para el Token (CAMBIO: Mapear desde la relación)
+        // Antes: const roles = [user.role]
+        // Ahora: Recorremos la lista de userRoles
+        const roles = user.userRoles.map(ur => ur.role.name);
+
+        // 4. Generar Token (IGUAL QUE ANTES - Tu corrección de tipos)
+        const tokenPayload = {
             userId: user.id,
             email: user.email,
-            roles: user.userRoles.map(ur => ur.role.name)
+            roles: roles // ['client'] o ['admin', 'seller']
         };
 
         const secret = process.env.JWT_SECRET || 'secret_default';
-const signOptions: SignOptions = {
+        
+        const signOptions: SignOptions = {
             expiresIn: (process.env.JWT_EXPIRES_IN ? parseInt(process.env.JWT_EXPIRES_IN) : 3600) as number | undefined
         };
 
-const token = jwt.sign(tokenPayload, secret, signOptions);
-        // 4. (Opcional pero recomendado para seguridad Nivel 10)
-        // Aquí deberíamos guardar el hash del token en la tabla RefreshToken
-        // Lo omitiremos por un momento para probar lo básico primero.
+        const token = jwt.sign(tokenPayload, secret, signOptions);
 
         return {
             user: {
                 id: user.id,
                 email: user.email,
-                roles: tokenPayload.roles
+                roles: roles
             },
             token
         };
