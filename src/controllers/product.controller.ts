@@ -21,6 +21,33 @@ export class ProductController {
         }
     }
 
+ // Este método usa la función getSellerInventory del servicio que calcula lo vendido
+    static async getInventory(req: any, res: Response) {
+        try {
+            const userId = req.user.userId;
+            // Obtenemos los productos con la propiedad 'sold' ya calculada
+            const products = await ProductService.getSellerInventory(userId);
+            
+            res.json({
+                message: 'Inventario y estadísticas recuperadas.',
+                count: products.length,
+                inventory: products.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    price: p.price,
+                    stock: p.stock,
+                    // DATOS DE NEGOCIO ADICIONALES
+                    sold: p.sold, 
+                    earnings: p.sold * p.price, // Dinero generado (Vendidos * Precio)
+                    // Lógica visual para el Frontend: Alertas de Stock
+                    status: p.stock === 0 ? 'AGOTADO' : (p.stock < 5 ? 'BAJO STOCK' : 'DISPONIBLE')
+                }))
+            });
+        } catch (error: any) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     // 2. Obtener Catálogo Completo (Home Page)
     // Mezcla inventario local + catálogo general externo
     // REGLA DE NEGOCIO: Mostrar ofertas primero, luego el resto del inventario.

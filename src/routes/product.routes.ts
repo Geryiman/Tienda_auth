@@ -19,4 +19,11 @@ router.post('/',
     ProductController.create
 );
 
+// 4. Obtener Inventario del Vendedor (Privado)
+router.get('/inventory',
+    authenticateToken,
+    hasRole(['admin', 'seller']),
+    ProductController.getInventory
+);
+
 export default router;

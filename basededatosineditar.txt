@@ -168,3 +168,73 @@ model Product {
   userId      Int
   user        User     @relation(fields: [userId], references: [id])
 }
+
+// ============================================
+// 12. CARRITO DE COMPRAS
+// ============================================
+model Cart {
+  id        Int        @id @default(autoincrement())
+  userId    Int        @unique // Un usuario solo tiene un carrito activo
+  updatedAt DateTime   @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[] // Los productos dentro
+
+  @@map("carts")
+}
+
+model CartItem {
+  id          Int      @id @default(autoincrement())
+  cartId      Int
+  
+  // Identificadores (Híbrido)
+  productId   Int?     // Si es local, guardamos el ID
+  externalId  String?  // Si es externo (DummyJSON), guardamos su ID string
+  
+  // Snapshot (Foto de los datos al momento de agregar)
+  name        String
+  price       Float
+  quantity    Int      @default(1)
+  imageUrl    String?
+
+  cart        Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  // Relación opcional con producto local (para control de stock)
+  product     Product? @relation(fields: [productId], references: [id])
+
+  @@map("cart_items")
+}
+
+// ============================================
+// 13. ÓRDENES DE COMPRA (Historial Final)
+// ============================================
+model Order {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  total       Float
+  status      String      @default("PENDING") // PENDING, PAID, SHIPPED, CANCELLED
+  createdAt   DateTime    @default(now())
+  
+  // Datos de envío simples
+  address     String?
+  
+  user        User        @relation(fields: [userId], references: [id])
+  items       OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  
+  productId   Int?
+  externalId  String?
+  
+  name        String
+  price       Float    // Precio al que se vendió (puede cambiar en el futuro)
+  quantity    Int
+  
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}

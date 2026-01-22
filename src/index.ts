@@ -11,6 +11,8 @@ import { time, timeStamp } from "node:console";
 
 import authRoutes from './routes/auth.routes';
 import productRoutes from "./routes/product.routes";
+import cartRoutes from './routes/cart.routes'; 
+import orderRoutes from './routes/order.routes';
 
 dortenv.config();
 
@@ -43,6 +45,8 @@ app.get("/", (req: Request, res: Response) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
+app.use('/api/cart', cartRoutes);   
+app.use('/api/orders', orderRoutes); 
 
 
 
